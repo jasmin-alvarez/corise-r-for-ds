@@ -2,12 +2,11 @@
 output: github_document
 ---
 
-
 ```{r setup, message = FALSE, include = FALSE}
 library(tidyverse)
 knitr::opts_chunk$set(
   echo = TRUE,
-  eval = FALSE,
+  eval = TRUE,
   collapse = TRUE,
   comment = "#>",
   fig.path = "img/",
@@ -51,30 +50,26 @@ tbl_names <- readr::read_csv(file_name_names, show_col_types = FALSE)
 tbl_names
 ```
 
-
 #### Lifetables
 
-In order to estimate age from a person's name, we will additionally need actuarial data that can tell us the chances that someone is still alive, based on when they were born. Fortunately, the SSA provides detailed 
-[actuarial life tables](https://www.ssa.gov/oact/NOTES/as120/LifeTables_Tbl_6_1990.html) by birth cohorts for the US.
+In order to estimate age from a person's name, we will additionally need actuarial data that can tell us the chances that someone is still alive, based on when they were born. Fortunately, the SSA provides detailed [actuarial life tables](https://www.ssa.gov/oact/NOTES/as120/LifeTables_Tbl_6_1990.html) by birth cohorts for the US.
 
+| year | age |      qx |    lx |  dx |    Lx |      Tx |    ex | sex |
+|-----:|----:|--------:|------:|----:|------:|--------:|------:|:----|
+| 1910 |  39 | 0.00283 | 78275 | 222 | 78164 | 3129636 | 39.98 | F   |
+| 1910 |  40 | 0.00297 | 78053 | 232 | 77937 | 3051472 | 39.09 | F   |
+| 1910 |  41 | 0.00318 | 77821 | 248 | 77697 | 2973535 | 38.21 | F   |
+| 1910 |  42 | 0.00332 | 77573 | 257 | 77444 | 2895838 | 37.33 | F   |
+| 1910 |  43 | 0.00346 | 77316 | 268 | 77182 | 2818394 | 36.45 | F   |
+| 1910 |  44 | 0.00351 | 77048 | 270 | 76913 | 2741212 | 35.58 | F   |
 
-| year| age|      qx|    lx|  dx|    Lx|      Tx|    ex|sex |
-|----:|---:|-------:|-----:|---:|-----:|-------:|-----:|:---|
-| 1910|  39| 0.00283| 78275| 222| 78164| 3129636| 39.98|F   |
-| 1910|  40| 0.00297| 78053| 232| 77937| 3051472| 39.09|F   |
-| 1910|  41| 0.00318| 77821| 248| 77697| 2973535| 38.21|F   |
-| 1910|  42| 0.00332| 77573| 257| 77444| 2895838| 37.33|F   |
-| 1910|  43| 0.00346| 77316| 268| 77182| 2818394| 36.45|F   |
-| 1910|  44| 0.00351| 77048| 270| 76913| 2741212| 35.58|F   |
-
-The key column of interest to us is `lx`, which provides the number of people born in a year who live up to a given age. The probability of being alive can be derived as `lx` by 100,000. You can read the documentation for the lifetables to understand what the other columns mean. 
+The key column of interest to us is `lx`, which provides the number of people born in a year who live up to a given age. The probability of being alive can be derived as `lx` by 100,000. You can read the documentation for the lifetables to understand what the other columns mean.
 
 How do we get this data in R? There are no CSV files to download. The data is on the website of the SSA as an HTML table. Moreover, the data for different years are on different pages. This is a very common situation you will find yourself in as a data scientist.
 
-Fortunately, R and the `tidyverse` has an excellent set of packages that make it easy to scrape data from the web programmatically and bring them into R as a table. This goes beyond the scope of this course and so I have simply included the code I used to scrape this data. 
+Fortunately, R and the `tidyverse` has an excellent set of packages that make it easy to scrape data from the web programmatically and bring them into R as a table. This goes beyond the scope of this course and so I have simply included the code I used to scrape this data.
 
 The code below defining two functions, `read_lifetable()` and `read_lifetables()`, which read life tables from the Social Security Administration's website and processes the data into a more usable format.
-
 
 ```{r}
 read_lifetable <- function(year) {
@@ -135,15 +130,19 @@ It is always a good idea to plot the data to understand it better. Given that th
 tbl_lifetables |> 
   # Filter for rows where age and year sum up to 2022
   filter(age + year == 2022) |> 
+  
   # Initialize a ggplot of year vs. probability of being alive (lx/10^5)
   ggplot(aes(x = year, y =lx/10^5 , color = sex)) +
+  
   # Add a step layer
   geom_step() +
+  
   #This is extra 
   # Added a smooth curve layer based on the sex (boy or       girl)of the person
   # Using a special method called "loess" to draw the curve   in a smooth way
   # The curve doesn't have any shaded area around it because   it was set se = FALSE
   geom_smooth(aes(group = sex), method = "loess", se = FALSE) +
+  
   # Add labels (title, subtitle, x, y, caption)
   labs(
     title = "Survival Curve For A Person To Be Alive in 2022",
@@ -152,12 +151,12 @@ tbl_lifetables |>
     y = "Probability of Being Alive",
     caption = "Source:SSA"
   ) +
+  
   # Update theme to move plot title
   theme(plot.title.position = 'plot')
 ```
 
 Looking at the plot, we gather that a male born in 1950 has almost a 50% chance of being alive in 2022. Notice that `tbl_lifetable` only has entries for every decade. In order to figure out the distribution of people alive, we need the probabilities for every year. One way to fill up the gaps in the data is to use some kind of interpolation, a method of approximating unknown values by using nearby known values. We will extend the lifetable by adding the full sequence of years for every sex and age combination, and then extrapolating the data to compute lx for the newly added combinations. If you're unfamiliar with interpolation or would like to learn more about other ways to handle missing data, you can check out this [10-minute Youtube video](https://www.youtube.com/watch?v=RpxoN9-i7Jc&ab_channel=JeffreyChasnov) by Jeffrey Chasnov on interpolation for further information.
-
 
 ### Transform Data
 
@@ -165,9 +164,9 @@ Looking at the plot, we gather that a male born in 1950 has almost a 50% chance 
 
 We can extend the lifetables this by using three useful functions:
 
-1. `full_seq`: Creates a full sequence of values in a vector.
-2. `complete`: Completes a data frame with missing combinations.
-3. `na.spline`: Replace `NA` with interpolated values using cubic interpolation.
+1.  `full_seq`: Creates a full sequence of values in a vector.
+2.  `complete`: Completes a data frame with missing combinations.
+3.  `na.spline`: Replace `NA` with interpolated values using cubic interpolation.
 
 Given that we want to interpolate for all combinations of `sex` and `age`, we first need to group by `sex` and `age`, then use `complete` and `full_seq` to add the missing combinations, and finally `zoo::na.approx` to interpolate the `NA` values using cubic interpolation. We will `ungroup` the data at the end as the grouping is no longer necessary.
 
@@ -350,7 +349,7 @@ tbl_names_extended |>
 Let us now get the top 25 most popular names for Females.
 
 ```{r tbl-names-female-top-25}
-# Create `tbl_names_female_top_25` with name and sex for top 25 females
+ # Create `tbl_names_female_top_25` with name and sex  for top 25 females
   tbl_names_female_top_25 <- tbl_names |>
   
   # Group by sex and name
